@@ -984,23 +984,22 @@ impl DocumentCore {
         let new_para = Paragraph::new_empty();
         self.document.sections[section_idx].paragraphs.insert(para_idx, new_para);
 
-        let reflow_target = if para_idx > 0 { para_idx - 1 } else { para_idx };
         let old_col = self.para_column_map.get(section_idx)
-            .and_then(|m| m.get(reflow_target)).copied().unwrap_or(0);
+            .and_then(|m| m.get(para_idx)).copied().unwrap_or(0);
         self.reflow_paragraph(section_idx, para_idx);
         crate::renderer::composer::recalculate_section_vpos(
-            &mut self.document.sections[section_idx].paragraphs, reflow_target,
+            &mut self.document.sections[section_idx].paragraphs, para_idx,
         );
         self.insert_composed_paragraph(section_idx, para_idx);
         self.paginate_if_needed();
 
         for _ in 0..2 {
             let new_col = self.para_column_map.get(section_idx)
-                .and_then(|m| m.get(reflow_target)).copied().unwrap_or(0);
+                .and_then(|m| m.get(para_idx)).copied().unwrap_or(0);
             if new_col == old_col { break; }
             self.reflow_paragraph(section_idx, para_idx);
             crate::renderer::composer::recalculate_section_vpos(
-                &mut self.document.sections[section_idx].paragraphs, reflow_target,
+                &mut self.document.sections[section_idx].paragraphs, para_idx,
             );
             self.recompose_paragraph(section_idx, para_idx);
             self.paginate_if_needed();
@@ -2024,6 +2023,39 @@ mod tests {
             let tree = core.build_page_tree(p as u32);
             assert!(tree.is_ok(), "페이지 {} 렌더 트리 빌드 실패: {:?}", p, tree.err());
         }
+    }
+
+    #[test]
+    fn test_insert_paragraph_append() {
+        let mut core = DocumentCore::new_empty();
+        core.create_blank_document_native().unwrap();
+        assert_eq!(core.document.sections[0].paragraphs.len(), 1);
+
+        let result = core.insert_paragraph_native(0, 1).unwrap();
+        assert!(result.contains(r#""paraIdx":1"#));
+        assert!(result.contains(r#""newParagraphCount":2"#));
+        assert_eq!(core.document.sections[0].paragraphs.len(), 2);
+        assert_eq!(core.event_log.len(), 1);
+        match &core.event_log[0] {
+            DocumentEvent::ParagraphInserted { section, para } => {
+                assert_eq!(*section, 0);
+                assert_eq!(*para, 1);
+            }
+            other => panic!("예상: ParagraphInserted, 실제: {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_insert_paragraph_prepend() {
+        let mut core = DocumentCore::new_empty();
+        core.create_blank_document_native().unwrap();
+        core.insert_text_native(0, 0, 0, "existing text").unwrap();
+
+        let result = core.insert_paragraph_native(0, 0).unwrap();
+        assert!(result.contains(r#""paraIdx":0"#));
+        assert!(result.contains(r#""newParagraphCount":2"#));
+        assert_eq!(core.document.sections[0].paragraphs.len(), 2);
+        assert!(core.document.sections[0].paragraphs[1].text.contains("existing text"));
     }
 }
 

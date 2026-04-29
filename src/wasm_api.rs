@@ -1088,6 +1088,10 @@ impl HwpDocument {
             .map_err(|e| e.into())
     }
 
+    /// 빈 문단을 지정 위치에 삽입한다.
+    ///
+    /// `para_idx == paragraphCount` 이면 구역 끝에 추가(append).
+    /// 반환값: JSON `{"ok":true,"paraIdx":<n>,"newParagraphCount":<n>}`
     #[wasm_bindgen(js_name = insertParagraph)]
     pub fn insert_paragraph(&mut self, section_idx: u32, para_idx: u32) -> Result<String, JsValue> {
         self.insert_paragraph_native(section_idx as usize, para_idx as usize)

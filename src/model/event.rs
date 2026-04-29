@@ -119,6 +119,15 @@ mod tests {
     }
 
     #[test]
+    fn test_paragraph_inserted_to_json() {
+        let event = DocumentEvent::ParagraphInserted { section: 2, para: 5 };
+        let json = event.to_json();
+        assert!(json.contains(r#""type":"ParagraphInserted""#));
+        assert!(json.contains(r#""section":2"#));
+        assert!(json.contains(r#""para":5"#));
+    }
+
+    #[test]
     fn test_serialize_event_log_empty() {
         let result = serialize_event_log(&[]);
         assert_eq!(result, r#"{"ok":true,"events":[]}"#);
