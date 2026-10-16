@@ -229,7 +229,11 @@ impl HwpxReader {
 
     /// 아카이브 내 파일 목록을 반환한다.
     pub fn file_names(&self) -> Vec<String> {
-        self.archive.file_names().map(|s| s.to_string()).collect()
+        self.archive
+            .file_names()
+            .filter_map(|s| s.ok())
+            .map(|s| s.to_string())
+            .collect()
     }
 }
 
