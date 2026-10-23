@@ -53,26 +53,21 @@ jobs:
         with:
           toolchain: nightly
 
-      - name: Cache cargo-fuzz + sanitizer build
-        uses: Swatinem/rust-cache@f0d9c3887740aee45f6153b24b3a6b815192ec16 # v2.9.1
-        with:
-          workspaces: fuzz
-          shared-key: fuzz-smoke-${{ matrix.target }}
-          # fuzz/Cargo.lock 은 .gitignore 대상이라 저장소에 없다. cargo-fuzz 가 실행
-          # 때마다 새로 만들고 그 내용이 조금씩 달라져, cache key 의 마지막 조각인
-          # lock 해시가 매 실행 바뀐다(restore key 인 env 해시는 고정).
-          #
-          # 그래서 이 캐시는 **한 번도 restore 되지 않는다.** 실측(2026-10-18) 최근
-          # 3개 run 모두 6개 타깃 전부 `No cache found.` 였고 restore 성공은 0건이다.
-          # 저장만 되고 다시 읽히지 않으니 6개 타깃 × 약 320MB = 하루 약 1.9GiB 가
-          # 순수 낭비로 쌓인다. fuzz-smoke 캐시 30개 9.26GiB 가 6개 타깃 × 5일치였고,
-          # 이것이 Actions cache 한도(10GB)를 밀어 올려 cache-generation-sweep 이
-          # 103.5% 로 실패했다.
-          #
-          # lock 해시가 매일 바뀌는 한 세대 상한으로는 회수할 수 없다(날마다 별개
-          # 그룹이 된다). 저장을 막는 것이 맞다. restore 는 그대로 둔다 — lock 이
-          # 우연히 같아지면 그대로 재사용된다.
-          save-if: false
+      # cargo-fuzz 빌드 캐시는 저장하지 않는다.
+      #
+      # fuzz/Cargo.lock 은 .gitignore 대상이라 저장소에 없고 cargo-fuzz 가 실행마다
+      # 새로 만든다. 그 내용이 조금씩 달라져 key 의 lock 해시가 매 실행 바뀌므로 이
+      # 캐시는 한 번도 restore 되지 않는다. 실측(2026-10-18) 최근 3개 run 은 6개 타깃
+      # 전부 `No cache found.` 였다. 6개 타깃 × 약 320MB = 하루 약 1.9GiB 가 저장만
+      # 되고, fuzz-smoke 캐시 30개 9.26GiB 가 Actions cache 한도 10GB 를 밀어 올려
+      # cache-generation-sweep 이 103.5% 로 실패했다.
+      #
+      # #4080 이후의 세대 상한으로도 회수되지 않는다. rust-cache 는 shared-key 와 잡
+      # 사이에 해시 조각이 하나 더 있는 key 를 쓴다
+      # (`v0-rust-<shared-key>-<os>-<arch>-<lock앞8>-<env앞8>`). sweep 의 groupOf 는
+      # 후행 해시 **하나만** 떼므로 최상위 key 마다 그룹이 갈리고, 최신 2세대를 남기는
+      # 규칙이 매일 새 그룹을 그대로 살린다. 스텝을 아예 두지 않는 것이 유일한 차단
+      # 지점이다. 빌드 캐시가 없어 수 분 느려지지만 restore 성공 0건과 같은 값이다.
 
       - name: Install cargo-fuzz
         run: cargo install cargo-fuzz
